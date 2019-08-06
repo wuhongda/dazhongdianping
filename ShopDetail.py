@@ -4,7 +4,7 @@ import random
 import re
 import threading
 import time
-import database as db
+import Database as db
 from lxml import etree
 g_lock=threading.Lock() #定义锁
 
@@ -57,16 +57,16 @@ headers = {'User-Agent': random.choice(user_agent),  # 随机选取头部代理,
 #解析woff字体库的数字类型
 word={
     'x':'.',
-    'f3fc':'1',
-    'e6cb':'2',
-    'ed50':'3',
-    'f39f':'4',
-    'e7b6':'5',
-    'e0ab':'6',
-    'f47a':'7',
-    'f876':'8',
-    'f8b6':'9',
-    'e1bc':'0',
+    'e719':'1',
+    'ef77':'2',
+    'f200':'3',
+    'ef11':'4',
+    'efab':'5',
+    'e887':'6',
+    'e594':'7',
+    'f537':'8',
+    'ecb6':'9',
+    'e32b':'0',
 }
 hreflist=[]#全局请求URL列表
 
@@ -113,7 +113,6 @@ class GetShopInfo(threading.Thread):
             for i in range(3):
                 a = comment_score[i]
                 alist.append(a)
-            #print(alist)
             for k in alist:
                 b = str(k)
                 c = b.replace('<d class="num">', '').replace('</d>', '').replace('&#x', ' ').replace(';', '').replace('.',' ')
@@ -134,17 +133,39 @@ class GetShopInfo(threading.Thread):
             return all_list
         except:
             return "error"
+    #解析地址加密
+    def get_address(self,address):
+        addstr = ''
+        for s in address:
+            tmp = s.replace('<e class="address">', ' ').replace('</e>', ' ').replace('<d class="num">', ' ').replace('</d>', ' ').replace(';', '').replace('&#x', '')
+            addstr = addstr + str(tmp)
+        addlist = addstr.split(' ')
+        while '' in addlist:
+            addlist.remove('')
+        result = ''
+        for a in addlist:
+            sql = 'select word from woff20190806 where sixteen_key=\'%s\' ;' % (a)
+            dbresult = db.select_data(sql)
+            if len(dbresult)==0:
+                dbresult=a
+                result=result+str(a)
+            else:
+                for a in dbresult:
+                    result = result + str(a)
+        return result
     def run(self):
             global hreflist
             while len(hreflist)>0:
                 print("需要请求的数据还剩："+str(len(hreflist))+'条')
-                g_lock.acquire()#操作list加锁
-                tmp = random.choice(hreflist)#随机选取一个URL
+                g_lock.acquire()
+                tmp = random.choice(hreflist)
                 hreflist.remove(tmp)
-                g_lock.release()#操作list结束之后释放锁信息
+                g_lock.release()
                 url = "http://" + tmp
-                shopid=int(url.split('/')[4])#根据URL分割得到shopid
-                r1 = requests.get('http://47.100.21.174:8899/api/v1/proxies?limit=60').json() #选取代理IP
+                # 根据URL分割得到shopid
+                shopid=int(url.split('/')[4])
+                # 选取代理IP
+                r1 = requests.get('http://47.100.21.174:8899/api/v1/proxies?limit=60').json()
                 proxy = random.choice(r1['proxies'])
                 try:
                     r = requests.get(url, headers=headers,proxies={'https': 'https://{}:{}'.format(proxy['ip'], proxy['port'])}, timeout=3)
@@ -156,30 +177,36 @@ class GetShopInfo(threading.Thread):
                         avgPriceTitle = re.findall('<span id="avgPriceTitle" class="item">(.*?)</span>', r.text, re.S)
                         # 点评相关信息
                         comment_score = re.findall('<span class="item">(.*?)</span> ', r.text, re.S)
-                        '''处理正则匹配内容 数据清洗返回'''
+                        #地址相关信息
+                        add=re.findall('<span class="item" itemprop="street-address" id="address">(.*?)</span>', r.text, re.S)
+
+                        #对网页获取内容进行解析
                         sname = g.get_name(shopname)
                         avg=g.get_avg(avgPriceTitle)
                         com=g.get_comment(comment_score)
+                        address=g.get_address(add)
+
                         #根据Xpath方式获取地址 城市 ->行政区->美食分类
                         dom_tree = etree.HTML(r.text)
-                        link1 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[2]/text()')
-                        link2 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[3]/text()')
-                        link3 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[4]/text()')
+                        link1 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[2]/text()')#美食分类
+                        link2 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[3]/text()')#行政区
+                        link3 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[4]/text()')#商圈信息
                         if com!='error':
-                            if len(link3)!=0: #有些偏远餐厅不存在link3商圈数据 选择两种SQL语句
-                                sql = "insert into shop_tmp(shopid,name,tag,region,area,avg,flavor,envir,service) values (%s,\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\');" % (
-                            shopid, sname, link1[0], link2[0], link3[0],avg.replace('人均', '').replace(':', '').replace('元', ''),com[0].replace('口味', '').replace(':', ''), com[1].replace('环境', '').replace(':', ''),com[2].replace('服务', '').replace(':', ''))
+                            if len(link3)!=0:
+                                sql = "insert into shop_tmp(shopid,name,tag,region,area,avg,flavor,envir,service,address) values (%s,\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\');" % (shopid, sname,
+                                       link1[0], link2[0], link3[0],avg.replace('人均', '').replace(':', '').replace('元', ''),com[0].replace('口味', '').replace(':', ''),
+                                       com[1].replace('环境', '').replace(':', ''),com[2].replace('服务', '').replace(':', ''),address)
                             else:
-                                sql = "insert into shop_tmp(shopid,name,tag,region,avg,flavor,envir,service) values (%s,\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\');" % (
+                                sql = "insert into shop_tmp(shopid,name,tag,region,avg,flavor,envir,service,address) values (%s,\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\');" % (
                                     shopid, sname, link1[0], link2[0],
                                     avg.replace('人均', '').replace(':', '').replace('元', ''),
                                     com[0].replace('口味', '').replace(':', ''),
                                     com[1].replace('环境', '').replace(':', ''),
-                                    com[2].replace('服务', '').replace(':', ''))
-                            #print(sql)
+                                    com[2].replace('服务', '').replace(':', ''),
+                                    address)
+                            print(sql)
                             dbresult=db.inset_data(sql)
                             if dbresult==1:
-                                #将已经获取到的数据在URL表中更新status字段
                                 sql="update dzcomment_shop set status=1 where shopid=%s"%(shopid)
                                 print(sql)
                                 db.inset_data(sql)
@@ -187,9 +214,8 @@ class GetShopInfo(threading.Thread):
                         print(r.status_code)
                 except Exception as e:
                     print(e)
-                time.sleep(random.randint(8,20 )) #模拟浏览器随机在8~20秒之内选择随机时间间隔访问
 
-
+                time.sleep(random.randint(10,30 ))
 class GetURL(threading.Thread):
     def run(self):
         sql = "select DISTINCT (shophref) from dzcomment_shop  where status is NULL;"
@@ -199,9 +225,7 @@ class GetURL(threading.Thread):
 if __name__ == '__main__':
         a=GetURL()
         a.start()
-
-        #开启多线程
-        for a in range (4)
-            g = GetShopInfo()
-            g.start()
+        time.sleep(3)
+        g = GetShopInfo()
+        g.start()
 
