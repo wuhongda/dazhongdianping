@@ -133,6 +133,12 @@ class GetShopInfo(threading.Thread):
             return all_list
         except:
             return "error"
+    #解析点评星级
+    def get_level(self, level):
+            result = ''
+            for s in level:
+                result = result + str(s)
+            return result
     #解析地址加密
     def get_address(self,address):
         addstr = ''
@@ -153,6 +159,31 @@ class GetShopInfo(threading.Thread):
                 for a in dbresult:
                     result = result + str(a)
         return result
+    #解析电话号码
+    def get_phone(self,phone):
+        addstr = ''
+        for s in phone:
+            tmp = s.replace('<span class="info-name">', ' ').replace('</d>', ' ').replace('<d class="num">', ' ').replace(
+                '</d>', ' ').replace(';', '').replace('&#x', '').replace('</span>',' ').replace('电话：','').replace('&nbsp',',')
+            addstr = addstr + str(tmp)
+        addlist = addstr.split(' ')
+        while '' in addlist:
+            addlist.remove('')
+        if addlist[0]=='无':
+            result='无添加'
+        else:
+            result = ''
+            for a in addlist:
+                sql = 'select word from woff20190806 where sixteen_key=\'%s\' ;' % (a)
+                dbresult = db.select_data(sql)
+                if len(dbresult) == 0:
+                    dbresult = a
+                    result = result + str(a)
+                else:
+                    for a in dbresult:
+                        result = result + str(a)
+        return result
+
     def run(self):
             global hreflist
             while len(hreflist)>0:
@@ -162,10 +193,9 @@ class GetShopInfo(threading.Thread):
                 hreflist.remove(tmp)
                 g_lock.release()
                 url = "http://" + tmp
-                # 根据URL分割得到shopid
-                shopid=int(url.split('/')[4])
-                # 选取代理IP
-                r1 = requests.get('http://47.100.21.174:8899/api/v1/proxies?limit=60').json()
+                print(url)
+                shopid=int(url.split('/')[4])#根据URL分割得到shopid
+                r1 = requests.get('http://47.100.21.174:8899/api/v1/proxies?limit=60').json() #选取代理IP
                 proxy = random.choice(r1['proxies'])
                 try:
                     r = requests.get(url, headers=headers,proxies={'https': 'https://{}:{}'.format(proxy['ip'], proxy['port'])}, timeout=3)
@@ -177,33 +207,46 @@ class GetShopInfo(threading.Thread):
                         avgPriceTitle = re.findall('<span id="avgPriceTitle" class="item">(.*?)</span>', r.text, re.S)
                         # 点评相关信息
                         comment_score = re.findall('<span class="item">(.*?)</span> ', r.text, re.S)
-                        #地址相关信息
                         add=re.findall('<span class="item" itemprop="street-address" id="address">(.*?)</span>', r.text, re.S)
-
-                        #对网页获取内容进行解析
+                        pho=re.findall('<p class="expand-info tel">(.*?)</p>', r.text, re.S)
+                        lev = re.findall('<span title="(.*?)" class="mid-rank-stars ', r.text, re.S)
                         sname = g.get_name(shopname)
                         avg=g.get_avg(avgPriceTitle)
                         com=g.get_comment(comment_score)
                         address=g.get_address(add)
-
+                        phone=g.get_phone(pho)
+                        level=g.get_level(lev)
                         #根据Xpath方式获取地址 城市 ->行政区->美食分类
                         dom_tree = etree.HTML(r.text)
-                        link1 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[2]/text()')#美食分类
-                        link2 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[3]/text()')#行政区
-                        link3 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[4]/text()')#商圈信息
+                        link1 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[2]/text()')
+                        link2 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[3]/text()')
+                        link3 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[4]/text()')
                         if com!='error':
                             if len(link3)!=0:
-                                sql = "insert into shop_tmp(shopid,name,tag,region,area,avg,flavor,envir,service,address) values (%s,\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\');" % (shopid, sname,
-                                       link1[0], link2[0], link3[0],avg.replace('人均', '').replace(':', '').replace('元', ''),com[0].replace('口味', '').replace(':', ''),
-                                       com[1].replace('环境', '').replace(':', ''),com[2].replace('服务', '').replace(':', ''),address)
+                                sql = "insert into shop_tmp(shopid,name,level,tag,region,area,avg,flavor,envir,service,address,phone) values \
+                                        (%s,\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\');" \
+                                      % (shopid,\
+                                         sname.replace(" ", ""),\
+                                         level,\
+                                         link1[0].replace(" ", ""),\
+                                         link2[0].replace(" ", ""), \
+                                         link3[0].replace(" ", ""),\
+                                         avg.replace('人均', '').replace(':', '').replace('元', ''),\
+                                         com[0].replace('口味', '').replace(':', ''), \
+                                         com[1].replace('环境', '').replace(':', ''),\
+                                         com[2].replace('服务', '').replace(':', ''),\
+                                         address,phone)
                             else:
-                                sql = "insert into shop_tmp(shopid,name,tag,region,avg,flavor,envir,service,address) values (%s,\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\');" % (
-                                    shopid, sname, link1[0], link2[0],
-                                    avg.replace('人均', '').replace(':', '').replace('元', ''),
-                                    com[0].replace('口味', '').replace(':', ''),
-                                    com[1].replace('环境', '').replace(':', ''),
-                                    com[2].replace('服务', '').replace(':', ''),
-                                    address)
+                                sql = "insert into shop_tmp(shopid,name,level,tag,region,avg,flavor,envir,service,address,phone) \
+                                       values (%s,\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\');" \
+                                      % (shopid, sname, level,\
+                                         link1[0].replace(" ", ""),\
+                                         link2[0].replace(" ", ""),\
+                                         avg.replace('人均', '').replace(':', '').replace('元', ''),\
+                                         com[0].replace('口味', '').replace(':', ''),\
+                                         com[1].replace('环境', '').replace(':', ''),\
+                                         com[2].replace('服务', '').replace(':', ''),\
+                                         address,phone)
                             print(sql)
                             dbresult=db.inset_data(sql)
                             if dbresult==1:
@@ -218,7 +261,7 @@ class GetShopInfo(threading.Thread):
                 time.sleep(random.randint(10,30 ))
 class GetURL(threading.Thread):
     def run(self):
-        sql = "select DISTINCT (shophref) from dzcomment_shop  where status is NULL;"
+        sql = "select DISTINCT (shophref) from dzcomment_shop  where status is NULL and tag='西餐' ;"
         href = db.select_data(sql)
         global hreflist
         hreflist=href
