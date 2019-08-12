@@ -5,7 +5,7 @@
 1.根据request获取网页内容  
 2.对网页进行解析发现字体和数字使用了WOFF字体加密   
 3.通过对网页导入的WOFF字体文件进行解密 
-https://github.com/wuhongda/dazhongdianping/blob/master/%E6%95%B0%E6%8D%AE%E6%88%AA%E5%9B%BE/%E7%A8%8B%E5%BA%8F%E6%89%A7%E8%A1%8C.png   
+https://github.com/wuhongda/dazhongdianping/blob/master/程序执行.png  
 爬取方法：    
 1.每次需要根据网页内容中导入的Javascript找到对应的num和address所使用的woff字体文件.   
 2.第一次需要自行构建字体库,在GetWoff脚本中有对应的表结构,其中position对应的为字体的点阵,每次更新时Unicode码会变化但点阵不会变化.   
