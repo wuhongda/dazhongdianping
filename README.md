@@ -18,8 +18,10 @@
 3.将新的WOFF字体文件进行解析存库,然后与字库GetWoff脚本中对应的表做对比,对新表的word字段进行匹配.    
 本文纯属技术联系和学习交流使用,严禁作为商业用途如有侵权联系作者删除  
 
-
-![Image text](https://github.com/wuhongda/dazhongdianping/raw/master/数据截图/程序执行.png)   
+![Image text](https://github.com/wuhongda/dazhongdianping/raw/master/数据截图/店铺信息截图.png)  
+![Image text](https://github.com/wuhongda/dazhongdianping/raw/master/数据截图/店铺URL截图.png)  
+![Image text](https://github.com/wuhongda/dazhongdianping/raw/master/数据截图/程序执行.png)  
+![Image text](https://github.com/wuhongda/dazhongdianping/raw/master/数据截图/最终结果截图.png)   
 
 欢迎技术宅一起学习交流有问题可邮件沟通
 邮箱:hongda0812@163.com
