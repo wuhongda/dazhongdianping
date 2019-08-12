@@ -8,7 +8,7 @@ import io
 from bs4 import BeautifulSoup
 import string
 from requests_html import HTMLSession
-import database as db
+import Database as db
 
 url = 'http://www.dianping.com/beijing/ch10/g118'
 user_agent = [

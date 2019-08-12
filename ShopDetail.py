@@ -55,23 +55,10 @@ headers = {'User-Agent': random.choice(user_agent),  # 随机选取头部代理,
            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
            }
 #解析woff字体库的数字类型
-word={
-    'x':'.',
-    'e719':'1',
-    'ef77':'2',
-    'f200':'3',
-    'ef11':'4',
-    'efab':'5',
-    'e887':'6',
-    'e594':'7',
-    'f537':'8',
-    'ecb6':'9',
-    'e32b':'0',
-}
 hreflist=[]#全局请求URL列表
 
-class GetShopInfo(threading.Thread):
-
+class GetShopInfo(threading.Thread):#开启多线程需要继承thread
+    #因为使用网页源码进行findall匹配 去掉多余的标签都是根据空格去分割字符然后匹配字典
     #获取均价信息
     def get_avg(self,avglist):
         clist=''
@@ -81,11 +68,12 @@ class GetShopInfo(threading.Thread):
             clist = c.split(' ')
             #print(clist)
         s = ''
-        #print(clist)
+        #print(clist) 可以去掉注释查看对应的打印输出信息
         for k in clist:
             try:
                 if len(k) == 4:
-                    tmp = word[k]
+                    sql = 'select word from woff_dic where sixteen_key=\'%s\' ;' % (k)
+                    tmp = db.select_data(sql)[0]
                 else:
                     tmp = str(k)
                 s = s + str(tmp)
@@ -123,7 +111,8 @@ class GetShopInfo(threading.Thread):
                     k = k.strip('.')
                     try:
                         if len(k) == 4:
-                            tmp = word[k]
+                            sql = 'select word from woff_dic where sixteen_key=\'%s\' ;' % (k)
+                            tmp = db.select_data(sql)[0]
                         else:
                             tmp = str(k)
                         s = s + str(tmp)
@@ -149,8 +138,9 @@ class GetShopInfo(threading.Thread):
         while '' in addlist:
             addlist.remove('')
         result = ''
+        #print(addlist)
         for a in addlist:
-            sql = 'select word from woff20190806 where sixteen_key=\'%s\' ;' % (a)
+            sql = 'select word from woff_dic where sixteen_key=\'%s\' ;' % (a)
             dbresult = db.select_data(sql)
             if len(dbresult)==0:
                 dbresult=a
@@ -174,7 +164,8 @@ class GetShopInfo(threading.Thread):
         else:
             result = ''
             for a in addlist:
-                sql = 'select word from woff20190806 where sixteen_key=\'%s\' ;' % (a)
+                sql = 'select word from woff_dic where sixteen_key=\'%s\' ;' % (a)
+                #print(sql)
                 dbresult = db.select_data(sql)
                 if len(dbresult) == 0:
                     dbresult = a
@@ -183,7 +174,7 @@ class GetShopInfo(threading.Thread):
                     for a in dbresult:
                         result = result + str(a)
         return result
-
+    #程序入口
     def run(self):
             global hreflist
             while len(hreflist)>0:
@@ -207,9 +198,14 @@ class GetShopInfo(threading.Thread):
                         avgPriceTitle = re.findall('<span id="avgPriceTitle" class="item">(.*?)</span>', r.text, re.S)
                         # 点评相关信息
                         comment_score = re.findall('<span class="item">(.*?)</span> ', r.text, re.S)
+                        #地址信息
                         add=re.findall('<span class="item" itemprop="street-address" id="address">(.*?)</span>', r.text, re.S)
+                        #商家电话号码 注意可能有多个号码
                         pho=re.findall('<p class="expand-info tel">(.*?)</p>', r.text, re.S)
+                        #商家星级
                         lev = re.findall('<span title="(.*?)" class="mid-rank-stars ', r.text, re.S)
+
+                        #处理获取的数据函数调用
                         sname = g.get_name(shopname)
                         avg=g.get_avg(avgPriceTitle)
                         com=g.get_comment(comment_score)
@@ -222,7 +218,7 @@ class GetShopInfo(threading.Thread):
                         link2 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[3]/text()')
                         link3 = dom_tree.xpath('//*[@id="body"]/div/div[1]/a[4]/text()')
                         if com!='error':
-                            if len(link3)!=0:
+                            if len(link3)!=0:#部分店铺不存在商圈所以多了一层判读
                                 sql = "insert into shop_tmp(shopid,name,level,tag,region,area,avg,flavor,envir,service,address,phone) values \
                                         (%s,\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\');" \
                                       % (shopid,\
@@ -249,19 +245,19 @@ class GetShopInfo(threading.Thread):
                                          address,phone)
                             print(sql)
                             dbresult=db.inset_data(sql)
+                            #如果获取数据后并存储到MySQL 更新URL表中字段Status的状态 支持断点爬取数据
                             if dbresult==1:
                                 sql="update dzcomment_shop set status=1 where shopid=%s"%(shopid)
-                                print(sql)
                                 db.inset_data(sql)
                     else:
-                        print(r.status_code)
+                        print(r.status_code)#403错误一般是被暂时屏蔽了 也有可能有验证码识别
                 except Exception as e:
                     print(e)
-
-                time.sleep(random.randint(10,30 ))
-class GetURL(threading.Thread):
+                time.sleep(random.randint(1,20 ))#随机生成休眠时间尽量加大步长 有代理池的大佬就绕路吧
+class GetURL():
     def run(self):
-        sql = "select DISTINCT (shophref) from dzcomment_shop  where status is NULL and tag='西餐' ;"
+        #支持断点爬取数据
+        sql = "select DISTINCT (shophref) from dzcomment_shop  where status is NULL  ;"
         href = db.select_data(sql)
         global hreflist
         hreflist=href
@@ -269,6 +265,7 @@ if __name__ == '__main__':
         a=GetURL()
         a.start()
         time.sleep(3)
+        #for a in range(5): 根据自己代理IP数量开启多线程
         g = GetShopInfo()
         g.start()
 
