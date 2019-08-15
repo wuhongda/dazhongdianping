@@ -1,5 +1,9 @@
 # dazhongdianping
-破解大众点评WOFF字体反爬技术
+破解大众点评WOFF字体反爬技术   
+
+欢迎技术宅一起学习交流有问题可邮件沟通(hongda0812@163.com)   
+
+
 
 爬取思路：  
 1.根据request获取网页内容  
@@ -23,6 +27,4 @@
 ![Image text](https://github.com/wuhongda/dazhongdianping/raw/master/数据截图/程序执行.png)  
 ![Image text](https://github.com/wuhongda/dazhongdianping/raw/master/数据截图/最终结果截图.png)   
 
-欢迎技术宅一起学习交流有问题可邮件沟通
-邮箱:hongda0812@163.com
 
